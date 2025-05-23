@@ -135,15 +135,87 @@ def main():
 
             except Exception as e:
                 print(f"❌ No se pudo extraer información de un campo: {e}")
-                print(f"🪵 Contenido HTML del container:\n{container.get_attribute('innerHTML')}")
 
+        #Agarro el amount financed por separado
+        amount_financed_element = driver.find_element(
+        By.XPATH,
+        "//div[contains(text(), 'Amount Financed')]/following-sibling::div"
+        )
 
+        amount_text = amount_financed_element.text.strip()
+        print("Amount Financed:", amount_text)
+        datos.append(("Amount Financed:", amount_text))
 
         
         #Abro el link al nombre del cliente
         click_nombre_cliente(driver, nommbre_cliente)
+        iframe = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.k-window iframe")))
+        # Cambiar al iframe
+        driver.switch_to.frame(iframe)
+        print("Estas en la pestania de Edit Buyer")
+        credit_app_tab = wait.until(EC.element_to_be_clickable((By.XPATH, "//li[.//span[text()='Credit App']]")))
+        credit_app_tab.click()
 
+        containers_dob = WebDriverWait(driver, 30).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "kendo-datepicker[formcontrolname='dateOfBirth'] input.k-input-inner"))
+        )
+        dob_input = driver.find_element(By.CSS_SELECTOR, "kendo-datepicker[formcontrolname='dateOfBirth'] input.k-input-inner")
+        dob = dob_input.get_attribute("value")
+        datos.append(("Date of Birth", dob))
 
+        # SSN
+        # Ubicar el campo SSN (input oculto dentro del kendo-textbox)
+        visible_input = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "kendo-textbox[formcontrolname='ssn'] input.k-input-inner"))
+            )
+
+        # Hacer click para revelar el SSN completo
+        visible_input.click()
+
+        # Ahora obtener el input oculto que tiene el valor completo
+        hidden_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "dc-ui-shared-masked-input[formcontrolname='ssn'] input.masked-input-textbox"))
+        )
+
+        # Obtener el valor completo del SSN
+        ssn_value = hidden_input.get_attribute("value")
+        print("SSN completo:", ssn_value)
+
+        # Agregar a la lista data
+        datos.append(("SSN", ssn_value))
+
+        # Email
+        email_input = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "kendo-textbox[formcontrolname='email'] input.k-input-inner"))
+        )
+
+        # Obtener el valor directamente
+        email_value = email_input.get_attribute("value")
+        print("Email:", email_value)
+
+        # Agregar a la lista de datos
+        datos.append(("Email", email_value))
+
+        # Cell Phone
+        phone_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input.k-input-inner[aria-placeholder='(999) 000-0000']"))
+        )
+
+        # Obtener el valor
+        phone_value = phone_input.get_attribute("value")
+        print("Phone:", phone_value)
+
+        # Agregar a la lista
+        datos.append(("Phone", phone_value))
+
+        #Obtener adress
+        address_input = driver.find_element(By.XPATH, '//input[@formcontrolname="FullAddress"]')
+
+        # Obtener el valor de la dirección
+        address = address_input.get_attribute('value')
+
+        print("Dirección actual:", address)
+        datos.append(("Adress", address))
         print("Datos extraídos:")
         print(datos)
         time.sleep(500)
