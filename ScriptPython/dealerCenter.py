@@ -27,68 +27,92 @@ def setup_driver():
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
-    
+
     service = Service(
         executable_path=CHROME_DRIVER_PATH,
         service_args=["--log-path=chromedriver.log"]
     )
-    
-    return webdriver.Chrome(service=service, options=options)
 
-def obtener_nombre_loan(deal_element):
-    """Extrae el nombre del loan de un elemento deal"""
-    nombre_cliente = deal_element.find_element(By.XPATH, ".//div[@class='row'][2]//div[@class='col-4 r-item']/span").text.strip()
-        
-    print(f"Nombre del cliente: {nombre_cliente}")
-    return nombre_cliente
-        
+    return webdriver.Chrome(service=service, options=options)
 
 def main():
     driver = None
+    datos = []  # Lista para almacenar datos scrapeados
+
     try:
         # Iniciar navegador
         driver = setup_driver()
         print("✅ Navegador configurado correctamente")
-        
+
         # Navegar a la página
         driver.get("https://app.dealercenter.net/apps/shell/reports/home")
         print("🔍 Cargando página...")
-        
-        # Esperar elementos
-        wait = WebDriverWait(driver, 500)
+
+        wait = WebDriverWait(driver, 30)
+
+        # Esperar input de búsqueda
         input_element = wait.until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, "input.k-input-inner[placeholder*='Search Inventory']")
         ))
-        
-        WebDriverWait(driver, 30).until(
-            EC.invisibility_of_element_located((By.CLASS_NAME, "busy-loader--blocking"))
-        )
-        
-          # Espera adicional
-        
-        # Interactuar con elementos
+
+        # Esperar que desaparezca el loader
+        wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "busy-loader--blocking")))
+
+        # Interactuar con input
         input_element.click()
         print("Campo loan disponible. Escribiendo loan...")
-        for char in LOAN_NUMBER:  # Corregido: Usar LOAN_NUMBER en lugar de loan_number
+        for char in LOAN_NUMBER:
             input_element.send_keys(char)
             time.sleep(0.1)
-        
+
         xpath_deal = f"//div[contains(@class, 'search-result-item') and .//div[contains(text(), 'Deal #:') and contains(., '{LOAN_NUMBER}')]]"
 
-        # Esperar hasta que el deal aparezca
+        # Esperar que aparezca el deal y hacer click
         deal_element = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, xpath_deal))
         )
-        obtener_nombre_loan(deal_element)
         deal_element.click()
-            
-        # Obtener nombre del deal
-        
-        
-        input("Presiona Enter para cerrar el navegador...")
-        
+
+        # Cambiar a iframe del pop-up
+        iframe = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "dc-iframe-dialog"))
+        )
+        driver.switch_to.frame(iframe)
+
+        # Esperar y obtener los contenedores con datos
+        containers = WebDriverWait(driver, 30).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.mb-2.d-flex.align-items-center"))
+        )
+
+        for container in containers:
+            try:
+                label_element = WebDriverWait(container, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".mr-auto.label, span.mr-auto.label"))
+                )
+                label = label_element.text.strip().lower().replace(" ", "_")
+
+                input_element = WebDriverWait(container, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[aria-valuenow]"))
+                )
+                valor_str = input_element.get_attribute("aria-valuenow")
+
+                if valor_str and valor_str != "":
+                    valor = float(valor_str)
+                    if valor.is_integer():
+                        valor = int(valor)
+                else:
+                    valor = None
+
+                datos.append((label, valor))
+
+            except Exception as e:
+                print(f"No se pudo extraer información de un campo: {e}")
+
+        print("Datos extraídos:")
+        print(datos)
+
     except Exception as e:
-        print(f"❌ Error durante la ejecución: {str(e)}")
+        print(f"❌ Error durante la ejecución: {e}")
         if "This version of ChromeDriver" in str(e):
             print("⚠️ Por favor actualiza ChromeDriver: https://chromedriver.chromium.org/downloads")
     finally:
