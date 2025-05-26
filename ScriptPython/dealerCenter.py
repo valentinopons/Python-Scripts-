@@ -4,13 +4,16 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+import pandas as pd
+
 import os
+import re
 import time
 
 # Configuración de rutas
 CHROME_DRIVER_PATH = r"C:\Users\ValentinoPons\Downloads\chromedriver-win64\chromedriver-win64\chromedriver.exe"
 PROFILE_PATH = r"C:\Users\ValentinoPons\AppData\Local\Google\Chrome\User Data\SeleniumProfile"
-LOAN_NUMBER = "6544"
+LOAN_NUMBER = "765"
 datos = []  # Lista para almacenar datos scrapeados
 frames =[] # Lista de frames para ir cambiando de paginas
 def setup_driver():
@@ -43,16 +46,27 @@ def obtener_nombre_loan(deal_element):
     datos.append(("Name", nombre_cliente))
     return nombre_cliente
 
+def cargar_datos_a_excel():
+    # Convertir la lista de tuplas en un solo diccionario
+    cliente_dict = dict(datos)
+
+    # Crear un DataFrame con una sola fila
+    df = pd.DataFrame([cliente_dict])
+
+    # Guardar en Excel
+    df.to_excel("clientes.xlsx", index=False)
+
 
 def click_nombre_cliente(driver, nombre_cliente):
-    wait = WebDriverWait(driver, 15)
+    wait = WebDriverWait(driver, 500)
     # Normalizo nombre para evitar doble espacio, mayúsculas, etc
-    nombre_normalizado = " ".join(nombre_cliente.upper().split())
+    nombre_normalizado = re.sub(r'\s+', ' ', nombre_cliente.strip()).upper()
     
     xpath = (
-        f"//div[contains(@class, 'header-customer-name__label') and "
-        f"contains(normalize-space(@title), '{nombre_normalizado}')]//a"
+    f"//div[contains(@class, 'header-customer-name__label') and "
+    f"contains(normalize-space(@title), '{nombre_normalizado}')]//a"
     )
+
 
     elemento = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
     elemento.click()
@@ -84,6 +98,7 @@ def main():
         # Interactuar con input
         input_element.click()
         print("Campo loan disponible. Escribiendo loan...")
+        datos.append(("Loan Number", LOAN_NUMBER))
         for char in LOAN_NUMBER:
             input_element.send_keys(char)
             time.sleep(0.1)
@@ -218,6 +233,20 @@ def main():
         datos.append(("Adress", address))
         print("Datos extraídos:")
         print(datos)
+
+        cargar_datos_a_excel()
+
+        #Cierro pestañia Edit Buyer
+        driver.switch_to.default_content()
+
+        close_button = WebDriverWait(driver, 500).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "button[title='Close']"))
+        )
+        close_button.click()
+
+
+
+
         time.sleep(500)
     except Exception as e:
         print(f"❌ Error durante la ejecución: {e}")
@@ -227,6 +256,7 @@ def main():
         if driver:
             driver.quit()
             print("🛑 Navegador cerrado")
+
 
 if __name__ == "__main__":
     main()
